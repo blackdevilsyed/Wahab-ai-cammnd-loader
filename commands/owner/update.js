@@ -132,7 +132,6 @@ async function updateViaZip(zipUrl) {
     'session',
     'tmp',
     'temp',
-    'database',
     'config.js'
   ];
   const copied = [];
