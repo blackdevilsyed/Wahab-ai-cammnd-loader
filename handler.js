@@ -100,7 +100,7 @@ if (activeConfig.autoReply && !isFromMe) {
   const mentionedJids =
     contentMsg?.extendedTextMessage?.contextInfo?.mentionedJid || [];
 
-  const isBotMentioned = mentionedJids.includes(botJid);
+  const isBotMentioned = mentionedJids.length > 0;
 
   if ((!isGroup || isBotMentioned) && !isCmd && textMsg.length > 0) {
 
@@ -240,4 +240,4 @@ module.exports = {
   isOwner
 };
 
-  
+                                            
