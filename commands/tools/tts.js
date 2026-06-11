@@ -42,7 +42,17 @@ module.exports = {
       );
 
     } catch (err) {
-      console.error('TTS Error:', err.response?.data || err.message);
+      try {
+        if (err.response?.data) {
+          console.log(
+            'TTS Error Response:',
+            Buffer.from(err.response.data).toString()
+          );
+        }
+      } catch (e) {}
+
+      console.log('TTS Error:', err.message);
+
       return extra.reply('❌ TTS Error.');
     }
   }
