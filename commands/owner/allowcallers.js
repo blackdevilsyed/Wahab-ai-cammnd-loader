@@ -1,96 +1,73 @@
 const fs = require('fs');
 const path = require('path');
-const config = require('../../config');
-
-function updateAllowedCallersFile(newArray) {
-  const configPath = path.join(__dirname, '../../config.js');
-  try {
-    let configData = fs.readFileSync(configPath, 'utf8');
-    const regex = /(allowedCallers:\s*\[)([^\]]*)(\])/;
-    const arrayString = newArray.map(num => `'${num}'`).join(', ');
-
-    if (regex.test(configData)) {
-        configData = configData.replace(regex, `$1${arrayString}$3`);
-        fs.writeFileSync(configPath, configData, 'utf8');
-        return true;
-    }
-    return false;
-  } catch (err) {
-    return false;
-  }
-}
 
 module.exports = {
   name: 'allowcallers',
-  aliases: ['allowcall', 'whitelist'],
   category: 'owner',
   ownerOnly: true,
-  description: 'Manage allowed callers for AntiCall feature',
-  usage: '.allowcallers <add/remove/list> <number>',
+  description: 'Add numbers to anti-call bypass list',
 
   async execute(sock, msg, args, extra) {
-    if (!config.allowedCallers) config.allowedCallers = [];
-    
-    const prefix = config.prefix || '.';
+    const from = extra.from || msg.key.remoteJid;
+    const action = args[0] ? args[0].toLowerCase() : '';
 
-    if (!args[0] || args[0].toLowerCase() === 'list') {
-      let listText = `╭═✦〔 🛡️ *ᴀʟʟᴏᴡᴇᴅ ᴄᴀʟʟᴇʀꜱ* 〕✦═╮\n│\n`;
+    // JSON فائل کا پاتھ سیٹ کریں جہاں ڈیٹا سیو ہوگا
+    const dataPath = path.join(__dirname, '../../allowed_callers.json'); 
 
-      if (config.allowedCallers.length === 0) {
-        listText += `│ ⚠️ No numbers whitelisted yet.\n`;
-      } else {
-        config.allowedCallers.forEach((num, index) => {
-          listText += `│ ${index + 1}. 📞 ${num}\n`;
+    // ہیلپر فنکشنز: ڈیٹا ریڈ اور رائٹ کرنے کے لیے
+    const getAllowedNumbers = () => {
+        if (!fs.existsSync(dataPath)) fs.writeFileSync(dataPath, JSON.stringify([]));
+        try {
+            return JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+        } catch (e) {
+            return [];
+        }
+    };
+    const saveAllowedNumbers = (data) => fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
+
+    if (action === 'add' || action === 'allow') {
+        // نمبر سے ہر قسم کے فالتو کریکٹرز یا پلس کا سائن صاف کریں
+        let inputNum = args.slice(1).join('').replace(/[^0-9]/g, '');
+        
+        if (!inputNum) {
+            return sock.sendMessage(from, { text: "⚠️ *Format Check:* \`.allowcallers add 923151105391\`" }, { quoted: msg });
+        }
+
+        // واٹس ایپ کا آفیشل فارمیٹ (JID) بنائیں
+        let fullJid = inputNum + '@s.whatsapp.net';
+        let currentList = getAllowedNumbers();
+
+        if (currentList.includes(fullJid)) {
+            return sock.sendMessage(from, { text: `ℹ️ یہ نمبر پہلے سے ہی الاؤ لسٹ میں موجود ہے۔` }, { quoted: msg });
+        }
+
+        try {
+            currentList.push(fullJid);
+            saveAllowedNumbers(currentList); // ڈیٹا بیس میں سیو
+            
+            return sock.sendMessage(from, { 
+                text: `✅ *Success:* @${inputNum} کو اینٹی کال بائی پاس لسٹ میں ایڈ کر دیا گیا ہے!`,
+                mentions: [fullJid]
+            }, { quoted: msg });
+        } catch (err) {
+            console.error(err);
+            return sock.sendMessage(from, { text: "❌ Failed to save number to JSON file." }, { quoted: msg });
+        }
+    }
+
+    // لسٹ دیکھنے کے لیے آپشن
+    if (action === 'list') {
+        const currentList = getAllowedNumbers();
+        if (currentList.length === 0) return sock.sendMessage(from, { text: "ℹ️ لسٹ خالی ہے۔ سب بلاک ہوں گے۔" }, { quoted: msg });
+
+        let listMsg = `⚡ 📲 *A L L O W E D   C A L L E R S* 📲 ⚡\n\n`;
+        currentList.forEach((num, index) => {
+            listMsg += `${index + 1}. @${num.split('@')[0]}\n`;
         });
-      }
-
-      listText += `│\n│ *ᴄᴏᴍᴍᴀɴᴅꜱ*\n`;
-      listText += `│ 🔹 \`${prefix}allowcallers add 923...\`\n`;
-      listText += `│ 🔹 \`${prefix}allowcallers remove 923...\`\n`;
-      listText += `╰═❀═════════════❀═╯`;
-
-      return extra.reply(listText);
+        return sock.sendMessage(from, { text: listMsg, mentions: currentList }, { quoted: msg });
     }
 
-    const action = args[0].toLowerCase();
-
-    if (!['add', 'remove'].includes(action)) {
-        return extra.reply(`❌ Invalid action! Use \`${prefix}allowcallers add/remove/list\`.`);
-    }
-
-    if (!args[1]) {
-        return extra.reply(`❌ Please provide a number with country code!\n\nExample: \`${prefix}allowcallers ${action} 923001234567\``);
-    }
-
-    let targetNumber = args[1].replace(/[^0-9]/g, '');
-
-    if (action === 'add') {
-        if (config.allowedCallers.includes(targetNumber)) {
-            return extra.reply(`⚠️ Number *${targetNumber}* is already in the whitelist.`);
-        }
-
-        config.allowedCallers.push(targetNumber);
-        if (updateAllowedCallersFile(config.allowedCallers)) {
-            return extra.reply(`✅ Successfully added *${targetNumber}* to the allowed callers list!`);
-        } else {
-            config.allowedCallers = config.allowedCallers.filter(num => num !== targetNumber);
-            return extra.reply(`❌ Failed to save number to config.js file.`);
-        }
-    }
-
-    if (action === 'remove') {
-        if (!config.allowedCallers.includes(targetNumber)) {
-            return extra.reply(`⚠️ Number *${targetNumber}* is not in the whitelist.`);
-        }
-
-        config.allowedCallers = config.allowedCallers.filter(num => num !== targetNumber);
-        if (updateAllowedCallersFile(config.allowedCallers)) {
-            return extra.reply(`✅ Successfully removed *${targetNumber}* from the allowed callers list!`);
-        } else {
-            config.allowedCallers.push(targetNumber);
-            return extra.reply(`❌ Failed to update config.js file.`);
-        }
-    }
+    return sock.sendMessage(from, { text: "💡 *Usage:* \`.allowcallers add 923151105391\` ya \`.allowcallers list\`" }, { quoted: msg });
   }
 };
-  
+      
