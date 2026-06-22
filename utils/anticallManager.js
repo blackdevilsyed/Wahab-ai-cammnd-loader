@@ -16,12 +16,20 @@ function ensureFile() {
         {
           enabled: false,
           warnings: {},
-          blocked: {}
+          blocked: {},
+          allowed: [] // 👈 Whitelist array
         },
         null,
         2
       )
     );
+  } else {
+    // Agar purani file ho tou usme allowed array daal do
+    let data = JSON.parse(fs.readFileSync(dataPath));
+    if (!data.allowed) {
+        data.allowed = [];
+        fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
+    }
   }
 }
 
@@ -38,3 +46,4 @@ module.exports = {
   loadData,
   saveData
 };
+      
