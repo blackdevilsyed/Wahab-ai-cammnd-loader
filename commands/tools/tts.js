@@ -2,8 +2,8 @@ const axios = require('axios');
 
 module.exports = {
   name: 'tts',
-  category: 'tools',
-  description: 'Text To Speech (Cloud Load Fixed)',
+  category: 'general',
+  description: 'Text To Speech (Universal Server Fix)',
   usage: '.tts [your text]',
 
   async execute(sock, msg, args, extra) {
@@ -23,22 +23,22 @@ module.exports = {
 
       const audioBuffer = Buffer.from(response.data);
 
-      // Khtambum Server ke load error ko bypass karne ke liye proper stream property
+      // Ultimate Hack: Is ko as a Document bhejenge audio mimetype ke sath
+      // Khtambum aur WhatsApp dono chup-chap bina nakhre kiye isko direct play kar denge
       await sock.sendMessage(
         from,
         {
-          audio: audioBuffer,
-          mimetype: 'audio/mp4', // MP4 container load error ko hal karta hai
-          ptt: false,
-          seconds: 15, // File duration manually pass karne se load ka error khatam ho jata hai
+          document: audioBuffer,
+          mimetype: 'audio/mpeg',
+          fileName: `TTS_${Date.now()}.mp3`
         },
         { quoted: msg }
       );
 
     } catch (err) {
-      console.error('TTS Load Error:', err.message);
-      return extra.reply('❌ TTS Error: Server media load failed.');
+      console.error('TTS Ultimate Error:', err.message);
+      return extra.reply('❌ TTS Error: Server bypassed protection failed.');
     }
   }
 };
-    
+
