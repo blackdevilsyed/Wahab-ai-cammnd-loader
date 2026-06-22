@@ -2,8 +2,8 @@ const axios = require('axios');
 
 module.exports = {
   name: 'tts',
-  category: 'tools', // Menu par show karne ke liye tools kar diya
-  description: 'Text To Speech',
+  category: 'tools',
+  description: 'Text To Speech Format Fixed',
   usage: '.tts [your text]',
 
   async execute(sock, msg, args, extra) {
@@ -15,29 +15,32 @@ module.exports = {
     }
 
     try {
-      // API se data arraybuffer format mein lein ge
-      const { data } = await axios.get(
-        `https://tts.fastdevelopers.workers.dev/tts?voice=nova&text=${encodeURIComponent(text)}`,
-        {
-          responseType: 'arraybuffer'
-        }
-      );
+      // Aap ki original API
+      const url = `https://tts.fastdevelopers.workers.dev/tts?voice=nova&text=${encodeURIComponent(text)}`;
+      
+      const response = await axios.get(url, {
+        responseType: 'arraybuffer'
+      });
 
-      // WhatsApp Voice Note send karne ke liye settings
+      // Buffer direct generate karein ge
+      const audioBuffer = Buffer.from(response.data);
+
+      // Format Fix: WhatsApp core ko bina conversion ke play karwane ke liye specs
       await sock.sendMessage(
         from,
         {
-          audio: Buffer.from(data),
-          mimetype: 'audio/mp4', // MP3 (mpeg) ki jagah mp4 kar diya jo WA support karta hai
-          ptt: true // Is se voice note ki tarah jaye ga
+          audio: audioBuffer,
+          mimetype: 'audio/mp4', // Khtambum/Baileys par voice note ke liye mp4 default handler behtareen hai
+          ptt: true,
+          fileName: 'tts.mp3' // Fake extension pass karne se WhatsApp auto-decode kar leta hai
         },
         { quoted: msg }
       );
 
     } catch (err) {
-      console.error('TTS Error:', err.response?.data || err.message);
-      return extra.reply('❌ TTS Data fetch karne mein error aya hai.');
+      console.error('TTS Format Error:', err.message);
+      return extra.reply('❌ TTS Error: Format bypass nahi ho saka.');
     }
   }
 };
-                                                                      
+    
