@@ -115,6 +115,51 @@ async function startBot() {
       }
   }
 
+  // =========================================================================
+  // 🛡️ SYED-MD ADVANCED ANTI-CALL INTERCEPTOR (BYPASS INTELLIGENCE)
+  // =========================================================================
+  sock.ev.on('call', async (callEvents) => {
+    const dataPath = path.join(__dirname, './allowed_callers.json');
+    let allowedCallers = [];
+    
+    // Whitelist file check & read
+    if (fs.existsSync(dataPath)) {
+        try { allowedCallers = JSON.parse(fs.readFileSync(dataPath, 'utf-8')); } catch (e) { allowedCallers = []; }
+    }
+
+    for (const call of callEvents) {
+        if (call.status === 'offer') {
+            const callFrom = call.from; 
+            const callId = call.id;
+
+            // ⚡ اگر نمبر الاؤ لسٹ میں ہے، تو کال کو کاٹے بغیر یہیں بائی پاس (Bypass) کر دو
+            if (allowedCallers.includes(callFrom)) {
+                console.log(chalk.green(`[CALL ALLOWED] Whitelisted member is calling: ${callFrom}`));
+                continue; 
+            }
+
+            // 🚫 اگر نمبر الاؤ لسٹ میں نہیں ہے، تو کال کٹ جائے گی
+            console.log(chalk.red(`[CALL BLOCKED] Unauthorized call from: ${callFrom}`));
+            try {
+                await sock.rejectCall(callId, callFrom);
+                
+                const warningCard = `⚡ 📲 *S Y E D   M D   S E C U R I T Y* 📲 ⚡\n` +
+                                    `╔═════════════════════════╗\n` +
+                                    `  ⚠️ *CALL DETECTED & REJECTED!*\n` +
+                                    `  👤 *FROM:* @${callFrom.split('@')[0]}\n` +
+                                    `  🚫 *STATUS:* Unauthorized Device\n` +
+                                    `╚═════════════════════════╝\n\n` +
+                                    `💡 _Note: Calling this bot is restricted. Please chat via text only._`;
+
+                await sock.sendMessage(callFrom, { text: warningCard, mentions: [callFrom] });
+            } catch (err) {
+                console.error('Anti-Call Injection Error:', err.message);
+            }
+        }
+    }
+  });
+  // =========================================================================
+
   // 4. Connection Events
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect } = update;
@@ -145,7 +190,7 @@ async function startBot() {
         console.log(chalk.blue(`🔧 Bot number auto-added as owner: ${botNum}`));
       }
 
-      handler.initializeAntiCall(sock);
+      // handler.initializeAntiCall(sock); // پرانے لیسنر کو کمنٹ کر دیا ہے تاکہ نئے انٹرسیپٹر کے ساتھ ٹکراؤ نہ ہو
     }
   });
 
@@ -179,4 +224,4 @@ setInterval(() => {
     if (global.gc) global.gc();
   } catch {}
 }, 30 * 60 * 1000);
-                  
+      
