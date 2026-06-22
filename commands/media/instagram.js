@@ -39,7 +39,7 @@ module.exports = {
             const mediaList = response.data.result;
 
             // 5. Constructing Caption (Sirf pehli file ke sath jayega)
-            let captionText = `╭━━『 *QADEER AI - INSTAGRAM* 』━━╮\n`;
+            let captionText = `╭━━『 *SYED ABDUL WAHAB BUKHARI ✍️- INSTAGRAM* 』━━╮\n`;
             captionText += `╰━━━━━━━━━━━━━━━━━━━━━╯\n\n`;
             captionText += `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ${config.botName || 'QADEER AI'}*`;
 
