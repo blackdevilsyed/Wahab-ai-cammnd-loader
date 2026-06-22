@@ -3,7 +3,7 @@ const axios = require('axios');
 module.exports = {
   name: 'info',
   aliases: ['sim', 'siminfo'],
-  category: 'tools',
+  category: 'general',
   description: 'Fetch SIM information for Pakistan, India, and Brazil',
   usage: '.info [number with country code]',
 
