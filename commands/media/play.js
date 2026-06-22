@@ -1,11 +1,10 @@
-const ytdl = require('@distube/ytdl-core');
 const axios = require('axios');
 
 module.exports = {
   name: 'play',
   aliases: ['song', 'music'],
-  category: 'general',
-  description: 'Search and play audio directly from YouTube',
+  category: 'media',
+  description: 'Search and play audio from YouTube (Stable)',
   usage: '.play [song name]',
 
   async execute(sock, msg, args, extra) {
@@ -18,71 +17,65 @@ module.exports = {
         }, { quoted: msg });
     }
 
-    // SYED MD Music Search Message
+    // Processing Message with SYED MD Branding
     const initialMsg = await sock.sendMessage(from, { 
-        text: `⚡ 💠 *S Y E D  M D  M U S I C* 💠 ⚡\n\n🔍 *Searching:* \`${songQuery}\`\n⏳ Please wait, fetching audio directly from YouTube...` 
+        text: `⚡ 💠 *S Y E D  M D  M U S I C* 💠 ⚡\n\n🔍 *Searching:* \`${songQuery}\`\n⏳ Please wait, preparing high-quality audio...` 
     }, { quoted: msg });
 
     try {
-      // YouTube search API to get the video ID/URL safely
+      // Step 1: YouTube Search (Stable Network)
       const searchUrl = `https://api.vreden.web.id/api/ytsearch?query=${encodeURIComponent(songQuery)}`;
       const searchResponse = await axios.get(searchUrl);
       
       if (!searchResponse.data || !searchResponse.data.result || searchResponse.data.result.length === 0) {
-          return sock.sendMessage(from, { text: "❌ *Error:* Song not found. Try again with proper spelling!" }, { quoted: msg });
+          return sock.sendMessage(from, { text: "❌ *Error:* Song not found. Check spelling!" }, { quoted: msg });
       }
 
-      const videoData = searchResponse.data.result[0]; // Pehla result utha liya
-      const videoUrl = videoData.url;
+      const video = searchResponse.data.result[0];
+      const videoUrl = video.url;
+
+      // Step 2: High-Speed Direct Audio Downloader API
+      const downloadUrl = `https://api.vreden.web.id/api/ytmp3?url=${encodeURIComponent(videoUrl)}`;
+      const downloadResponse = await axios.get(downloadUrl);
+
+      if (!downloadResponse.data || !downloadResponse.data.result || !downloadResponse.data.result.downloadUrl) {
+          return sock.sendMessage(from, { text: "❌ *Error:* Server cannot extract audio right now. Try again!" }, { quoted: msg });
+      }
+
+      const audioLink = downloadResponse.data.result.downloadUrl;
 
       // V.I.P UI Card
       let musicCard = `⚡ 📲  *S Y E D   M D   M U S I C*  📲 ⚡\n`;
       musicCard += `╔══════════════════════╗\n`;
-      musicCard += `  🎵 *TITLE:* \`${videoData.title || 'Unknown'}\`\n`;
-      musicCard += `  👤 *CHANNEL:* \`${videoData.author?.name || 'N/A'}\`\n`;
-      musicCard += `  ⏱️ *DURATION:* \`${videoData.timestamp || 'N/A'}\`\n`;
+      musicCard += `  🎵 *TITLE:* \`${video.title || 'Unknown'}\`\n`;
+      musicCard += `  👤 *CHANNEL:* \`${video.author?.name || 'N/A'}\`\n`;
+      musicCard += `  ⏱️ *DURATION:* \`${video.timestamp || 'N/A'}\`\n`;
       musicCard += `  🔗 *URL:* ${videoUrl}\n`;
       musicCard += `╚══════════════════════╝\n\n`;
-      musicCard += `🎶 *Sending Audio... Stay tuned!*`;
+      musicCard += `🎶 *Sending Audio Track... Enjoy!*`;
 
+      // Update Text Card
       await sock.sendMessage(from, { text: musicCard, edit: initialMsg.key });
 
-      // Direct High-Quality Audio Stream from YouTube (No FFmpeg required)
-      const stream = ytdl(videoUrl, {
-          filter: 'audioonly',
-          quality: 'highestaudio',
-          headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          }
-      });
+      // Step 3: Fetch Audio Buffer from Global CDN
+      const audioResponse = await axios.get(audioLink, { responseType: 'arraybuffer' });
+      const audioBuffer = Buffer.from(audioResponse.data);
 
-      const chunks = [];
-      stream.on('data', (chunk) => chunks.push(chunk));
-      
-      stream.on('end', async () => {
-          const audioBuffer = Buffer.concat(chunks);
-
-          // Sending Audio File safely
-          await sock.sendMessage(
-              from,
-              {
-                  audio: audioBuffer,
-                  mimetype: 'audio/mpeg',
-                  ptt: false
-              },
-              { quoted: msg }
-          );
-      });
-
-      stream.on('error', (err) => {
-          console.error('YTDL Stream Error:', err.message);
-          sock.sendMessage(from, { text: "❌ *Stream Error:* Failed to process video stream." }, { quoted: msg });
-      });
+      // Final Audio message without PTT (Best for long songs)
+      await sock.sendMessage(
+        from,
+        {
+          audio: audioBuffer,
+          mimetype: 'audio/mpeg',
+          ptt: false
+        },
+        { quoted: msg }
+      );
 
     } catch (err) {
-      console.error('Play Command Error:', err.message);
-      return sock.sendMessage(from, { text: "❌ *Server Error:* Unable to stream this song right now." }, { quoted: msg });
+      console.error('Play Global Command Error:', err.message);
+      return sock.sendMessage(from, { text: "❌ *Server Error:* Global downloaders are rate-limited. Try again later." }, { quoted: msg });
     }
   }
 };
-                                                                                           
+    
