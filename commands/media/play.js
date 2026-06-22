@@ -1,10 +1,11 @@
+const ytdl = require('@distube/ytdl-core');
 const axios = require('axios');
 
 module.exports = {
   name: 'play',
   aliases: ['song', 'music'],
-  category: 'media',
-  description: 'Search and play audio from YouTube',
+  category: 'general',
+  description: 'Search and play audio directly from YouTube',
   usage: '.play [song name]',
 
   async execute(sock, msg, args, extra) {
@@ -17,49 +18,66 @@ module.exports = {
         }, { quoted: msg });
     }
 
-    // Processing message with SYED MD branding
+    // SYED MD Music Search Message
     const initialMsg = await sock.sendMessage(from, { 
-        text: `⚡ 💠 *S Y E D  M D  M U S I C* 💠 ⚡\n\n🔍 *Searching:* \`${songQuery}\`\n⏳ Please wait, fetching audio data...` 
+        text: `⚡ 💠 *S Y E D  M D  M U S I C* 💠 ⚡\n\n🔍 *Searching:* \`${songQuery}\`\n⏳ Please wait, fetching audio directly from YouTube...` 
     }, { quoted: msg });
 
     try {
-      // YouTube search + download API 
-      const apiUrl = `https://api.dreaded.site/api/ytdl/play?query=${encodeURIComponent(songQuery)}`;
-      const response = await axios.get(apiUrl);
-      const resData = response.data;
-
-      if (!resData || resData.status !== 200 || !resData.result) {
-          return sock.sendMessage(from, { text: "❌ *Error:* Song not found or API is busy. Try another name!" }, { quoted: msg });
+      // YouTube search API to get the video ID/URL safely
+      const searchUrl = `https://api.vreden.web.id/api/ytsearch?query=${encodeURIComponent(songQuery)}`;
+      const searchResponse = await axios.get(searchUrl);
+      
+      if (!searchResponse.data || !searchResponse.data.result || searchResponse.data.result.length === 0) {
+          return sock.sendMessage(from, { text: "❌ *Error:* Song not found. Try again with proper spelling!" }, { quoted: msg });
       }
 
-      const song = resData.result;
-      
-      // V.I.P Card Output Design with SYED MD Branding
+      const videoData = searchResponse.data.result[0]; // Pehla result utha liya
+      const videoUrl = videoData.url;
+
+      // V.I.P UI Card
       let musicCard = `⚡ 📲  *S Y E D   M D   M U S I C*  📲 ⚡\n`;
       musicCard += `╔══════════════════════╗\n`;
-      musicCard += `  🎵 *TITLE:* \`${song.title || 'Unknown'}\`\n`;
-      musicCard += `  👤 *CHANNEL:* \`${song.channel || 'N/A'}\`\n`;
-      musicCard += `  ⏱️ *DURATION:* \`${song.duration || 'N/A'}\`\n`;
-      musicCard += `  🔗 *URL:* ${song.url || 'N/A'}\n`;
+      musicCard += `  🎵 *TITLE:* \`${videoData.title || 'Unknown'}\`\n`;
+      musicCard += `  👤 *CHANNEL:* \`${videoData.author?.name || 'N/A'}\`\n`;
+      musicCard += `  ⏱️ *DURATION:* \`${videoData.timestamp || 'N/A'}\`\n`;
+      musicCard += `  🔗 *URL:* ${videoUrl}\n`;
       musicCard += `╚══════════════════════╝\n\n`;
       musicCard += `🎶 *Sending Audio... Stay tuned!*`;
 
-      // Update text card
       await sock.sendMessage(from, { text: musicCard, edit: initialMsg.key });
 
-      // Fetch and send audio buffer
-      const audioResponse = await axios.get(song.downloadUrl, { responseType: 'arraybuffer' });
-      const audioBuffer = Buffer.from(audioResponse.data);
+      // Direct High-Quality Audio Stream from YouTube (No FFmpeg required)
+      const stream = ytdl(videoUrl, {
+          filter: 'audioonly',
+          quality: 'highestaudio',
+          headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          }
+      });
 
-      await sock.sendMessage(
-        from,
-        {
-          audio: audioBuffer,
-          mimetype: 'audio/mpeg',
-          ptt: false 
-        },
-        { quoted: msg }
-      );
+      const chunks = [];
+      stream.on('data', (chunk) => chunks.push(chunk));
+      
+      stream.on('end', async () => {
+          const audioBuffer = Buffer.concat(chunks);
+
+          // Sending Audio File safely
+          await sock.sendMessage(
+              from,
+              {
+                  audio: audioBuffer,
+                  mimetype: 'audio/mpeg',
+                  ptt: false
+              },
+              { quoted: msg }
+          );
+      });
+
+      stream.on('error', (err) => {
+          console.error('YTDL Stream Error:', err.message);
+          sock.sendMessage(from, { text: "❌ *Stream Error:* Failed to process video stream." }, { quoted: msg });
+      });
 
     } catch (err) {
       console.error('Play Command Error:', err.message);
@@ -67,4 +85,4 @@ module.exports = {
     }
   }
 };
-    
+                                                                                           
