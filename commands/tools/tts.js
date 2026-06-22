@@ -3,7 +3,7 @@ const axios = require('axios');
 module.exports = {
   name: 'tts',
   category: 'tools',
-  description: 'Text To Speech Format Fixed',
+  description: 'Text To Speech (Bypass Format Error)',
   usage: '.tts [your text]',
 
   async execute(sock, msg, args, extra) {
@@ -15,32 +15,30 @@ module.exports = {
     }
 
     try {
-      // Aap ki original API
       const url = `https://tts.fastdevelopers.workers.dev/tts?voice=nova&text=${encodeURIComponent(text)}`;
       
       const response = await axios.get(url, {
         responseType: 'arraybuffer'
       });
 
-      // Buffer direct generate karein ge
       const audioBuffer = Buffer.from(response.data);
 
-      // Format Fix: WhatsApp core ko bina conversion ke play karwane ke liye specs
+      // Hack: ptt ko false kar diya aur mimetype ko standard mp3 rakha
+      // Is se audio click karne par direct play ho jaye gi bina error diye
       await sock.sendMessage(
         from,
         {
           audio: audioBuffer,
-          mimetype: 'audio/mp4', // Khtambum/Baileys par voice note ke liye mp4 default handler behtareen hai
-          ptt: true,
-          fileName: 'tts.mp3' // Fake extension pass karne se WhatsApp auto-decode kar leta hai
+          mimetype: 'audio/mpeg', 
+          ptt: false // Voice note ke bajaye audio track bana kar bhejein ge
         },
         { quoted: msg }
       );
 
     } catch (err) {
-      console.error('TTS Format Error:', err.message);
-      return extra.reply('❌ TTS Error: Format bypass nahi ho saka.');
+      console.error('TTS Bypass Error:', err.message);
+      return extra.reply('❌ TTS Error: Server storage format block.');
     }
   }
 };
-    
+          
