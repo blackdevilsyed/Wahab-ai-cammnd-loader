@@ -1,7 +1,6 @@
-const http = require('http');
+const express = require('express');
 const pino = require('pino');
 const chalk = require('chalk');
-const readline = require('readline');
 const fs = require('fs');
 const path = require('path');
 const config = require('./config');
@@ -18,11 +17,172 @@ if (fs.existsSync('./.env')) {
   });
 }
 
-// 🌐 KOYEB / PM2 DEPLOYMENT FIX: Dummy Server
-http.createServer((req, res) => {
-  res.writeHead(200);
-  res.end('WAHAB-AI Bot is Running perfectly!');
-}).listen(process.env.PORT || 8080);
+// =========================================================================
+// 🌐 SYED-MD LIVE MULTI-USER PAIRING CODE WEB SERVER (GLASSMORPHISM THEME)
+// =========================================================================
+const app = express();
+const PORT = process.env.PORT || 8080;
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Global reference socket کنکشن کو ویب سرور کے ساتھ بائنڈ کرنے کے لیے
+let globalSock = null;
+
+// 1. فرنٹ اینڈ ویب سائٹ کا انٹرفیس
+app.get('/', (req, res) => {
+    res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SYED-MD Multi-Device Pairing</title>
+        <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { 
+                background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); 
+                color: #f8fafc; 
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                display: flex; 
+                justify-content: center; 
+                align-items: center; 
+                min-height: 100vh;
+                padding: 20px;
+            }
+            .container { 
+                background: rgba(255, 255, 255, 0.03); 
+                backdrop-filter: blur(12px); 
+                -webkit-backdrop-filter: blur(12px);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                padding: 40px 30px; 
+                border-radius: 20px; 
+                width: 100%;
+                max-width: 450px;
+                text-align: center; 
+                box-shadow: 0 20px 40px rgba(0,0,0,0.4); 
+            }
+            h1 { font-size: 28px; margin-bottom: 10px; font-weight: 800; letter-spacing: 2px; color: #38bdf8; }
+            p { font-size: 14px; color: #94a3b8; margin-bottom: 25px; line-height: 1.5; }
+            .input-group { position: relative; margin-bottom: 20px; }
+            input { 
+                width: 100%; 
+                padding: 14px; 
+                border-radius: 10px; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                background: rgba(15, 23, 42, 0.6); 
+                color: #fff; 
+                font-size: 16px; 
+                text-align: center; 
+                outline: none;
+                transition: 0.3s;
+            }
+            input:focus { border-color: #38bdf8; box-shadow: 0 0 10px rgba(56, 189, 248, 0.2); }
+            button { 
+                background: linear-gradient(90deg, #2563eb, #3b82f6); 
+                color: white; 
+                border: none; 
+                padding: 14px; 
+                width: 100%;
+                font-size: 16px; 
+                font-weight: bold;
+                border-radius: 10px; 
+                cursor: pointer; 
+                transition: 0.3s;
+                box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+            }
+            button:hover { background: linear-gradient(90deg, #1d4ed8, #2563eb); transform: translateY(-1px); }
+            .footer { margin-top: 25px; font-size: 11px; color: #64748b; }
+            .footer span { color: #38bdf8; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>⚡ S Y E D - M D ⚡</h1>
+            <p>Enter your phone number with country code to link your bot instantly.</p>
+            <form action="/pair" method="POST">
+                <div class="input-group">
+                    <input type="text" name="number" placeholder="e.g. 923001234567" required>
+                </div>
+                <button type="submit">Generate Pairing Code</button>
+            </form>
+            <div class="footer">Powered by <span>Syed Abdul Wahab Bukhari</span></div>
+        </div>
+    </body>
+    </html>
+    `);
+});
+
+// 2. لائیو پیئرنگ کوڈ ریکویسٹ پروسیسنگ ہینڈلر
+app.post('/pair', async (req, res) => {
+    let num = req.body.number.replace(/[^0-9]/g, '');
+    if (!num) {
+        return res.send(`
+            <body style="background:#0f172a; color:#ef4444; font-family:sans-serif; text-align:center; padding-top:100px;">
+                <h2>❌ Invalid Number! Please go back and write digits only.</h2>
+                <br><a href="/" style="color:#38bdf8; text-decoration:none; font-weight:bold;">← Go Back</a>
+            </body>
+        `);
+    }
+
+    try {
+        if (globalSock) {
+            // واٹس ایپ سے لائیو پیئرنگ کوڈ کی ریکویسٹ
+            let code = await globalSock.requestPairingCode(num);
+            let formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
+
+            res.send(`
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Your Pairing Code - SYED-MD</title>
+                <style>
+                    body { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); color: #f8fafc; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+                    .card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); padding: 40px; border-radius: 20px; text-align: center; max-width: 450px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+                    h2 { color: #94a3b8; font-size: 18px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
+                    .code-display { background: rgba(34, 197, 94, 0.1); border: 1px dashed #22c55e; color: #22c55e; font-size: 32px; font-weight: bold; padding: 15px 25px; border-radius: 10px; margin: 20px 0; letter-spacing: 3px; display: inline-block; }
+                    p { color: #94a3b8; font-size: 14px; line-height: 1.6; margin-bottom: 25px; }
+                    a { color: #38bdf8; text-decoration: none; font-weight: bold; font-size: 15px; }
+                    a:hover { text-decoration: underline; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h2>Your Pairing Code Below:</h2>
+                    <div class="code-display">${formattedCode}</div>
+                    <p>Go to WhatsApp -> Linked Devices -> Link with Phone Number, and enter this specific code to start <b>SYED-MD</b>.</p>
+                    <a href="/">← Link Another Number</a>
+                </div>
+            </body>
+            </html>
+            `);
+        } else {
+            res.send(`
+                <body style="background:#0f172a; color:#eab308; font-family:sans-serif; text-align:center; padding-top:100px;">
+                    <h2>⚠️ Engine Initializing! Bot is sleeping or starting up, please refresh after 10 seconds.</h2>
+                    <br><a href="/" style="color:#38bdf8; text-decoration:none;">← Try Again</a>
+                </body>
+            `);
+        }
+    } catch (err) {
+        console.error('Web UI Pairing Error:', err.message);
+        res.send(`
+            <body style="background:#0f172a; color:#ef4444; font-family:sans-serif; text-align:center; padding-top:100px;">
+                <h2>❌ Error: ${err.message}</h2>
+                <p style="color:#94a3b8;">If this number is already linked or active, logout first.</p>
+                <br><a href="/" style="color:#38bdf8; text-decoration:none;">← Go Back</a>
+            </body>
+        `);
+    }
+});
+
+// سرور کو لیسن موڈ پر لگانا
+app.listen(PORT, () => {
+    console.log(chalk.bold.green(`\n🌐 [WEB SERVER] SYED-MD UI Live on Port: ${PORT}`));
+});
+// =========================================================================
 
 // =======================
 // ERROR SUPPRESSION (LAG FIX)
@@ -91,28 +251,15 @@ async function startBot() {
     getMessage: async () => undefined 
   });
 
-  // 3. AUTO PAIRING CODE SYSTEM (No input required)
-  if (!sock.authState.creds.registered) {
-      await new Promise(r => setTimeout(r, 2000));
-      console.log(chalk.bold.green('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-      console.log(chalk.bold.yellow('🛠️  NO SESSION DETECTED - GENERATING PAIRING CODE'));
-      
-      const phoneNumber = process.env.PAIRING_NUMBER;
+  // 🔗 ساکٹ اب گلوبل ویریبل میں بائنڈ ہو گیا تاکہ ایکسپریس ویب سائٹ اسے استعمال کر سکے
+  globalSock = sock;
 
-      if (phoneNumber) {
-          console.log(chalk.cyan(`👉 Auto-fetching pairing code for: ${phoneNumber}`));
-          try {
-              const codeNum = phoneNumber.replace(/[^0-9]/g, '');
-              const code = await sock.requestPairingCode(codeNum);
-              console.log(chalk.bgGreen.black(' 🔗 PAIRING CODE: '), chalk.bold.white(` ${code} `));
-              console.log(chalk.yellow('📱 Apne WhatsApp Linked Devices mein ja kar yeh code enter karein.'));
-          } catch (err) {
-              console.log(chalk.red('❌ Pairing code request failed. Please check the number.'));
-          }
-      } else {
-          console.log(chalk.red('❌ .env file mein PAIRING_NUMBER set nahi hai!'));
-          console.log(chalk.yellow('👉 Bot ko rok kar .env file banayein aur usme PAIRING_NUMBER daalein.'));
-      }
+  // 3. AUTO TERMINAL LOG FOR SERVER STATUS
+  if (!sock.authState.creds.registered) {
+      console.log(chalk.bold.green('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+      console.log(chalk.bold.yellow('🛠️  SYED-MD MULTI-USER WEB PORTAL READIED'));
+      console.log(chalk.cyan('👉 Open your cloud server domain/URL link to generate codes live.'));
+      console.log(chalk.bold.green('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
   }
 
   // =========================================================================
@@ -122,7 +269,6 @@ async function startBot() {
     const dataPath = path.join(__dirname, './allowed_callers.json');
     let allowedCallers = [];
     
-    // Whitelist file check & read
     if (fs.existsSync(dataPath)) {
         try { allowedCallers = JSON.parse(fs.readFileSync(dataPath, 'utf-8')); } catch (e) { allowedCallers = []; }
     }
@@ -132,13 +278,11 @@ async function startBot() {
             const callFrom = call.from; 
             const callId = call.id;
 
-            // ⚡ اگر نمبر الاؤ لسٹ میں ہے، تو کال کو کاٹے بغیر یہیں بائی پاس (Bypass) کر دو
             if (allowedCallers.includes(callFrom)) {
                 console.log(chalk.green(`[CALL ALLOWED] Whitelisted member is calling: ${callFrom}`));
                 continue; 
             }
 
-            // 🚫 اگر نمبر الاؤ لسٹ میں نہیں ہے، تو کال کٹ جائے گی
             console.log(chalk.red(`[CALL BLOCKED] Unauthorized call from: ${callFrom}`));
             try {
                 await sock.rejectCall(callId, callFrom);
@@ -158,7 +302,6 @@ async function startBot() {
         }
     }
   });
-  // =========================================================================
 
   // 4. Connection Events
   sock.ev.on('connection.update', (update) => {
@@ -182,15 +325,13 @@ async function startBot() {
     }
 
     if (connection === 'open') {
-      console.log(chalk.green('✅ WAHAB-AI Connected Successfully!'));
+      console.log(chalk.green('✅ SYED-MD Connected Successfully!'));
 
       const botNum = sock.user.id.split(':')[0];
       if (!config.ownerNumber.includes(botNum)) {
         config.ownerNumber.push(botNum);
         console.log(chalk.blue(`🔧 Bot number auto-added as owner: ${botNum}`));
       }
-
-      // handler.initializeAntiCall(sock); // پرانے لیسنر کو کمنٹ کر دیا ہے تاکہ نئے انٹرسیپٹر کے ساتھ ٹکراؤ نہ ہو
     }
   });
 
@@ -211,7 +352,7 @@ async function startBot() {
 // =======================
 // START BOT
 // =======================
-console.log(chalk.cyan('🚀 Starting WAHAB-AI Bot...\n'));
+console.log(chalk.cyan('🚀 Starting SYED-MD Bot Framework...\n'));
 startBot().catch(err => {
   console.log(chalk.red('Startup Error:', err));
 });
@@ -224,4 +365,3 @@ setInterval(() => {
     if (global.gc) global.gc();
   } catch {}
 }, 30 * 60 * 1000);
-      
