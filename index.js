@@ -1,6 +1,6 @@
 /* ================================================================
-   🚀 SYED-MD CHATBOT ENGINE (CRYSTAL SPEED EDITION - IN-MEMORY FIX)
-   ⚡ 1. ULTRA-FAST PAIRING ENGINE (In-Memory Auth Token Generation)
+   🚀 SYED-MD CHATBOT ENGINE (CRYSTAL SPEED EDITION - STABLE STORAGE)
+   ⚡ 1. ULTRA-FAST PAIRING ENGINE (Safe /tmp Path Routing)
    🎨 2. 3D ANIMATED PORTAL UI (Professional Look)
    🛡️ 3. ANTI-BAN PROTECTION (Isolated Sandboxing)
    🎉 4. AUTOMATIC WELCOME MESSAGE SYSTEM (DM Injector)
@@ -15,10 +15,9 @@ const fs = require('fs');
 const path = require('path');
 const { 
     default: makeWASocket, 
+    useMultiFileAuthState,
     DisconnectReason, 
-    delay,
-    initAuthCreds,
-    BufferJSON
+    delay
 } = require('@whiskeysockets/baileys');
 
 const app = express();
@@ -26,8 +25,6 @@ const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-let globalSock = null;
 
 // =========================================================================
 // 🎨 [KAM 1]: 3D ANIMATED PORTAL FRONT-END (HTML + MODERN TAILWIND)
@@ -155,24 +152,23 @@ app.get('/', (req, res) => {
 });
 
 // =========================================================================
-// 🛡️ [KAM 2 & 4]: IN-MEMORY ULTRA PAIR ROUTE (NO STORAGE CONFLICT)
+// 🛡️ [KAM 2 & 4]: HIGH-SPEED /tmp STORAGE BASED PAIR ROUTE
 // =========================================================================
 app.get('/pair', async (req, res) => {
     let num = req.query.number;
     if (!num) return res.json({ error: "Number is required" });
     num = num.replace(/[^0-9]/g, '');
 
+    // Using Linux local absolute temporary execution environment path
+    const tempAuthFolder = path.join('/tmp', 'baileys_auth_' + num);
+    
     try {
-        // High-Speed In-Memory Auth implementation to bypass Railway disk lock
-        const creds = initAuthCreds();
-        const state = {
-            creds: creds,
-            keys: {
-                get: (type, ids) => { return {}; },
-                set: (data) => { } // Bypasses file storage loops entirely
-            }
-        };
+        if (!fs.existsSync(tempAuthFolder)) {
+            fs.mkdirSync(tempAuthFolder, { recursive: true });
+        }
 
+        const { state, saveCreds } = await useMultiFileAuthState(tempAuthFolder);
+        
         const sock = makeWASocket({
             version: [2, 3000, 1015698762],
             auth: state,
@@ -181,24 +177,28 @@ app.get('/pair', async (req, res) => {
             browser: ['Chrome', 'Windows', '10'] 
         });
 
-        // Small interval to build connection footprint
-        await delay(1000);
+        sock.ev.on('creds.update', saveCreds);
 
-        let code = await sock.requestPairingCode(num);
-        if(!code) {
-            return res.json({ error: "Token window generation timeout. Try again." });
+        // Allow socket options to lock instance state properties safely
+        await delay(2000);
+
+        if (sock.authState && sock.authState.creds) {
+            let code = await sock.requestPairingCode(num);
+            if (code) {
+                return res.json({ code: code });
+            }
         }
         
-        res.json({ code: code });
-        
+        res.json({ error: "Token key synchronization drops. Try again." });
+
         // =========================================================================
         // 🎉 [KAM 3]: AUTOMATIC WELCOME MESSAGE TRIGGER
         // =========================================================================
         sock.ev.on('connection.update', async (update) => {
-            const { connection } = update;
+            const { connection, lastDisconnect } = update;
             
             if (connection === 'open') {
-                console.log(`[SUCCESS] Device ${num} linked live in-memory.`);
+                console.log(`[SUCCESS] Device ${num} linked via secure dynamic execution path.`);
                 
                 const welcomeText = `✨ *W E L C O M E  TO  S Y E D - M D* ✨\n\n` +
                                     `👋 Salam! Your device has been successfully linked to *Core Engine*.\n\n` +
@@ -207,24 +207,29 @@ app.get('/pair', async (req, res) => {
                                     `⚡ _Powered by Syed Abdul Wahab Bukhari_`;
                 
                 await sock.sendMessage(`${num}@s.whatsapp.net`, { text: welcomeText });
-                
                 await delay(2000); 
                 sock.logout();
+            }
+
+            if (connection === 'close') {
+                const isLoggedOut = lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut;
+                if (!isLoggedOut) {
+                    setTimeout(() => {
+                        try {
+                            if (fs.existsSync(tempAuthFolder)) {
+                                fs.rmSync(tempAuthFolder, { recursive: true, force: true });
+                            }
+                        } catch(e) {}
+                    }, 10000);
+                }
             }
         });
 
     } catch (err) {
-        console.log('Error during pairing block extraction:', err);
+        console.log('Error during pairing process:', err);
         res.json({ error: "Sandbox initialization error: " + err.message });
     }
 });
-
-// =========================================================================
-// 🤖 MAIN BOT RUNTIME SUITE LOOP (PERSISTENT LISTENER)
-// =========================================================================
-async function startMainBot() {
-    // Left open for your local physical file tracking logic if needed later
-}
 
 // =========================================================================
 // 🤖 SERVER INITIALIZATION
@@ -239,3 +244,4 @@ server.keepAliveTimeout = 0;
 setInterval(() => {
     try { if (global.gc) global.gc(); } catch (e) {}
 }, 30 * 60 * 1000);
+        
