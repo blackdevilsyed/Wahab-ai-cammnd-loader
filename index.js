@@ -1,5 +1,5 @@
 /* ================================================================
-   🚀 SYED-MD CHATBOT ENGINE (CRYSTAL SPEED EDITION - COMPLETE)
+   🚀 SYED-MD CHATBOT ENGINE (CRYSTAL SPEED EDITION - DEFINITIVE)
    ⚡ 1. ULTRA-FAST PAIRING ENGINE (Instant Code Generation)
    🎨 2. 3D ANIMATED PORTAL UI (Professional Look)
    🛡️ 3. ANTI-BAN PROTECTION (Isolated Sandboxing)
@@ -123,13 +123,14 @@ app.get('/', (req, res) => {
                     const res = await fetch('/pair?number=' + num);
                     const data = await res.json();
                     if(data.code) {
-                        const formatted = data.code.match(/.{1,4}/g).join('-');
+                        const cleanCode = data.code.replace(/[^A-Za-z0-9]/g, '');
+                        const formatted = cleanCode.match(/.{1,4}/g).join('-');
                         document.getElementById('result').innerText = formatted;
                         document.getElementById('result').classList.remove('hidden');
                         document.getElementById('infoText').classList.remove('hidden');
                         btn.innerText = 'CODE INJECTED SUCCESSFULLY';
                     } else {
-                        alert(data.error || 'Pairing rejected. Try again.');
+                        alert(data.error || 'Server rejected request. Try again.');
                         resetForm();
                     }
                 } catch(err) {
@@ -153,34 +154,47 @@ app.get('/', (req, res) => {
 });
 
 // =========================================================================
-// 🛡️ [KAM 2 & 4]: ULTRA-FAST ANTI-BAN ISOLATION ENGINE (ZERO DELAY)
+// 🛡️ [KAM 2 & 4]: ULTRA-FAST ANTI-BAN ISOLATION ENGINE (DEFINITIVE)
 // =========================================================================
 app.get('/pair', async (req, res) => {
     let num = req.query.number;
     if (!num) return res.json({ error: "Number is required" });
     num = num.replace(/[^0-9]/g, '');
 
-    const tempAuthFolder = path.join(__dirname, `auth_${num}`);
+    const tempAuthFolder = path.join(__dirname, 'session_' + num);
     
     try {
+        if (!fs.existsSync(tempAuthFolder)) {
+            fs.mkdirSync(tempAuthFolder, { recursive: true });
+        }
+
         const { state, saveCreds } = await useMultiFileAuthState(tempAuthFolder);
         
         const sock = makeWASocket({
-            version: [2, 3000, 1015698762], // Static version to bypass network sync wait
+            version: [2, 3000, 1015698762],
             auth: state,
             printQRInTerminal: false,
             logger: pino({ level: 'fatal' }),
             browser: ['Chrome', 'Windows', '10'] 
         });
 
-        if (!sock.authState.creds.registered) {
-            const code = await sock.requestPairingCode(num);
-            res.json({ code: code });
-        } else {
-            res.json({ error: "Active session structure already exists." });
+        // Event listener right away registers state modifications
+        sock.ev.on('creds.update', saveCreds);
+
+        // Explicit structural logic synchronization buffer
+        await delay(1500);
+
+        if (!sock.authState || !sock.authState.creds) {
+            return res.json({ error: "State credentials infrastructure failure." });
         }
 
-        sock.ev.on('creds.update', saveCreds);
+        // Generate dynamic pairing token key directly
+        let code = await sock.requestPairingCode(num);
+        if(!code) {
+            return res.json({ error: "Bypassed token generation window. Retry." });
+        }
+        
+        res.json({ code: code });
         
         // =========================================================================
         // 🎉 [KAM 3]: AUTOMATIC WELCOME MESSAGE TRIGGER
@@ -189,7 +203,7 @@ app.get('/pair', async (req, res) => {
             const { connection, lastDisconnect } = update;
             
             if (connection === 'open') {
-                console.log(`\x1b[32m[SUCCESS] Device ${num} speed connection established.\x1b[0m`);
+                console.log(`[SUCCESS] Device ${num} dynamic socket is open.`);
                 
                 const welcomeText = `✨ *W E L C O M E  TO  S Y E D - M D* ✨\n\n` +
                                     `👋 Salam! Your device has been successfully linked to *Core Engine*.\n\n` +
@@ -207,18 +221,19 @@ app.get('/pair', async (req, res) => {
                 const isLoggedOut = lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut;
                 if (!isLoggedOut) {
                     setTimeout(() => {
-                        if (fs.existsSync(tempAuthFolder)) {
-                            fs.rmSync(tempAuthFolder, { recursive: true, force: true });
-                            console.log(`[🧹 CLEANER] Wiped structural assets for node: ${num}`);
-                        }
-                    }, 3000);
+                        try {
+                            if (fs.existsSync(tempAuthFolder)) {
+                                fs.rmSync(tempAuthFolder, { recursive: true, force: true });
+                            }
+                        } catch(e) {}
+                    }, 5000);
                 }
             }
         });
 
     } catch (err) {
-        console.error('Handshake Failure:', err.message);
-        res.json({ error: "Engine execution sandboxing error." });
+        console.log('Error during pairing block extraction:', err);
+        res.json({ error: "Sandbox initialization error: " + err.message });
     }
 });
 
@@ -229,7 +244,6 @@ async function startMainBot() {
     const mainSessionPath = path.join(__dirname, 'session');
     if (!fs.existsSync(mainSessionPath)) return;
 
-    console.log("\x1b[36m[🤖 MAIN ENGINE] Booting background runtime protocols...\x1b[0m");
     const { state, saveCreds } = await useMultiFileAuthState(mainSessionPath);
     
     globalSock = makeWASocket({
@@ -242,13 +256,6 @@ async function startMainBot() {
 
     globalSock.ev.on('creds.update', saveCreds);
 
-    globalSock.ev.on('connection.update', (update) => {
-        const { connection } = update;
-        if (connection === 'open') {
-            console.log("\x1b[32m[✅ MAIN BOT] Main channel listener running live!\x1b[0m");
-        }
-    });
-
     globalSock.ev.on('messages.upsert', async (chatUpdate) => {
         try {
             const msg = chatUpdate.messages[0];
@@ -260,29 +267,22 @@ async function startMainBot() {
             if (text.toLowerCase() === '.menu') {
                 await globalSock.sendMessage(from, { text: "📜 *SYED-MD Active Menu:* Core architecture is working flawlessly." });
             }
-        } catch (e) {
-            console.error('Messaging loop logic exception:', e.message);
-        }
+        } catch (e) {}
     });
 }
 
 // =========================================================================
-// 🤖 SERVER INITIALIZATION (DYNAMIC PORT FIX & BINDING FOR RAILWAY)
+// 🤖 SERVER INITIALIZATION
 // =========================================================================
 const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n\x1b[35m🌐 [SERVER] Portal cluster operational on interface port: ${PORT}\x1b[0m`);
-    startMainBot().catch(err => console.log('Main Execution Interrupted:', err.message));
+    console.log(`[SERVER] Portal operational on port: ${PORT}`);
+    startMainBot().catch(() => {});
 });
 
 server.timeout = 0;
 server.keepAliveTimeout = 0;
 
-// =========================================================================
-// 🧹 [BONUS]: RAM GC MEMORY FLUSHER DEPLOYMENT
-// =========================================================================
 setInterval(() => {
-    try {
-        if (global.gc) global.gc();
-    } catch (e) {}
+    try { if (global.gc) global.gc(); } catch (e) {}
 }, 30 * 60 * 1000);
-             
+           
