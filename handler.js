@@ -1,19 +1,15 @@
-const config = require('./config');
-const { loadCommands } = require('./utils/commandLoader');
-const axios = require('axios');
-const { loadData, saveData } = require('./utils/anticallManager');
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
+const { loadCommands } = require('./utils/commandLoader');
+const { loadData, saveData } = require('./utils/anticallManager');
 const { normalizeJid, resolveLidToPn, extractNumber } = require('./utils/jidHelper');
 
-// Load all commands
 const commands = loadCommands();
-
-// ─── Persona File Path ────────────────────────────────────────────────────────
 const PERSONA_FILE = path.join(__dirname, 'data', 'persona.json');
 
-// Default persona (fallback agar file na mile)
-const DEFAULT_PERSONA =
+// Default Persona
+const DEFAULT_PERSONA = 
   'You are SYED-AI, a friendly WhatsApp AI created by Syed Abdul Wahab Bukhari.\n\n' +
   'Rules:\n' +
   '- Reply in the user\'s language (English, Urdu, or Roman Urdu).\n' +
@@ -24,14 +20,14 @@ const DEFAULT_PERSONA =
   '- Be respectful and honest.\n\n' +
   'User message:\n';
 
-// Persona file exist na kare to create karo
+// Initialize Persona File
 if (!fs.existsSync(PERSONA_FILE)) {
   const dataDir = path.join(__dirname, 'data');
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   fs.writeFileSync(PERSONA_FILE, JSON.stringify({ prompt: DEFAULT_PERSONA }, null, 2), 'utf8');
 }
 
-// Live persona loader — har message par fresh padhta hai
+// Read Persona
 const getPersona = () => {
   try {
     const raw = fs.readFileSync(PERSONA_FILE, 'utf8');
@@ -41,28 +37,22 @@ const getPersona = () => {
   }
 };
 
-// ─── Owner Check (Updated for Bot Number) ─────────────────────────────────────
+// Owner Verification
 const isOwner = (senderJid, sock, activeConfig) => {
   if (!senderJid) return false;
-  
   const senderNum = extractNumber(senderJid);
   
-  // 1. Config.js wali list check karein
   if (activeConfig.ownerNumber.includes(senderNum)) return true;
   
-  // 2. Bot ka apna connected number hamesha owner rahay
   if (sock && sock.user && sock.user.id) {
     const botNum = extractNumber(sock.user.id);
     if (senderNum === botNum) return true;
-    
-    // Check LID if available
     if (sock.user.lid && extractNumber(sock.user.lid) === senderNum) return true;
   }
-  
   return false;
 };
 
-// ─── Main Message Handler ─────────────────────────────────────────────────────
+// Message Handler
 const handleMessage = async (sock, msg) => {
   try {
     if (!msg.message) return;
@@ -70,45 +60,37 @@ const handleMessage = async (sock, msg) => {
     const from = normalizeJid(msg.key.remoteJid);
     if (from.includes('@broadcast') || from.includes('@newsletter')) return;
 
-    // Refresh Config Live
     delete require.cache[require.resolve('./config')];
     const activeConfig = require('./config');
 
     const isGroup = from.endsWith('@g.us');
     const isFromMe = msg.key.fromMe;
-    
-    // Sender ID theek se extract karna
     const sender = normalizeJid(msg.key.participant || msg.key.remoteJid);
-    
     const userName = msg.pushName || 'Friend';
     const isSenderOwner = isOwner(sender, sock, activeConfig);
 
-    // Message ka text extract karna
     let contentMsg = msg.message?.ephemeralMessage?.message || msg.message?.viewOnceMessageV2?.message || msg.message;
     let body = contentMsg?.conversation || contentMsg?.extendedTextMessage?.text || contentMsg?.imageMessage?.caption || contentMsg?.videoMessage?.caption || '';
     let textMsg = body.trim();
     
-    // 🚀 NEW: NOPREFIX LOGIC ADDED HERE
     let isCmd = false;
     let commandName = '';
     let args = [];
 
-    // Live No-Prefix Status Read
+    // Prefix & No-Prefix Logic
     let isNoPrefixEnabled = activeConfig.noprefix;
     try {
       const npPath = path.join(__dirname, 'data', 'noprefix.json');
       if (fs.existsSync(npPath)) {
          isNoPrefixEnabled = JSON.parse(fs.readFileSync(npPath)).enabled;
       }
-    } catch(e) {}
+    } catch (e) {}
 
     if (textMsg.startsWith(activeConfig.prefix)) {
-      // With Prefix
       isCmd = true;
       args = textMsg.slice(activeConfig.prefix.length).trim().split(/\s+/);
       commandName = args.shift().toLowerCase();
     } else if (isNoPrefixEnabled) {
-      // Without Prefix (If enabled in config or json)
       let tempArgs = textMsg.trim().split(/\s+/);
       let possibleCmd = tempArgs[0]?.toLowerCase();
       
@@ -129,50 +111,38 @@ const handleMessage = async (sock, msg) => {
       }
     }
 
-    // ================= 1. CHATBOT FEATURE (AI Auto Reply) =================
+    // Chatbot AI Auto-Reply
     if (activeConfig.autoReply && !isFromMe && !isGroup) {
       if (!isCmd && textMsg.length > 0) {
         await sock.sendPresenceUpdate('composing', from);
-
         const persona = getPersona().replace(/\{name\}/g, userName);
 
         try {
-          const res = await axios.get(
-            `https://api.nexray.eu.cc/ai/gemini?text=${encodeURIComponent(persona + textMsg)}`
-          );
-          if (res.data.status && res.data.result) {
-            await sock.sendMessage(
-              from,
-              { text: res.data.result.trim() },
-              { quoted: msg }
-            );
+          const res = await axios.get(`https://arslan-apis-v2.vercel.app/ai/blackbox?q=${encodeURIComponent(persona + '\n' + textMsg)}`);
+          
+          // Smart response handler for different JSON structures
+          let replyText = res.data.result || res.data.reply || res.data.message || (typeof res.data === 'string' ? res.data : null);
+          
+          if (replyText) {
+            await sock.sendMessage(from, { text: String(replyText).trim() }, { quoted: msg });
           }
         } catch (err) {
-          console.error('Chatbot Error: ', err.message);
+          console.error('Chatbot Error:', err.message);
         }
       }
     }
 
-    // ================= 2. MODE FEATURE & COMMAND EXECUTION =================
+    // Command Execution
     if (!isCmd) return;
+    if (activeConfig.selfMode && !isSenderOwner && !isFromMe) return; 
 
-    if (activeConfig.selfMode && !isSenderOwner && !isFromMe) {
-      return; 
-    }
-
-    // Yahan pe direct command check kar raha hai kyunke upar args parse ho chuke hain
     const command = commands.get(commandName) || Array.from(commands.values()).find(c => c.aliases && c.aliases.includes(commandName));
     if (!command) return;
 
     if (command.ownerOnly && !isSenderOwner && !isFromMe) {
-      return sock.sendMessage(
-        from,
-        { text: activeConfig.messages.ownerOnly },
-        { quoted: msg }
-      );
+      return sock.sendMessage(from, { text: activeConfig.messages.ownerOnly }, { quoted: msg });
     }
 
-    // Command Execute karna (Simple style, no Meta AI tags)
     await command.execute(sock, msg, args, {
       from,
       sender,
@@ -186,8 +156,9 @@ const handleMessage = async (sock, msg) => {
   }
 };
 
-// ================= 3. ANTI-CALL FEATURE =================
+// Anti-Call System
 const initializeAntiCall = (sock) => {
+  // Auto-Unblock Interval
   setInterval(async () => {
     try {
       const data = loadData();
@@ -206,10 +177,11 @@ const initializeAntiCall = (sock) => {
       }
       if (changed) saveData(data);
     } catch (err) {
-      console.error('Auto-Unblock Error', err);
+      console.error('Auto-Unblock Error:', err);
     }
   }, 60 * 60 * 1000);
 
+  // Call Reject & Warning Logic
   sock.ev.on('call', async (calls) => {
     try {
       const data = loadData();
@@ -228,12 +200,11 @@ const initializeAntiCall = (sock) => {
         const caller = normalizeJid(call.from);
         const callerNumber = caller.split('@')[0].split(':')[0];
 
-        // 🛡️ WHITELIST CHECK: Owners aur JSON-based Allowed Callers
         const isOwner = activeConfig.ownerNumber.includes(callerNumber);
-        const isAllowedCaller = (data.allowed || []).includes(callerNumber); // 👈 JSON CHECK
+        const isAllowedCaller = (data.allowed || []).includes(callerNumber);
 
         if (isOwner || isAllowedCaller) {
-          console.log(`[🛡️ SYED MD] Call bypassed for whitelisted number: ${callerNumber}`);
+          console.log(`[SYED MD] Call bypassed for whitelisted number: ${callerNumber}`);
           continue; 
         }
 
@@ -254,7 +225,7 @@ const initializeAntiCall = (sock) => {
 
         if (warningCount <= 3) {
           await sock.sendMessage(caller, {
-            text: `⚠️ Warning ${warningCount}/3\n\n🚫 Calls are not allowed in this bot. After 3 warnings you will be blocked.`
+            text: `⚠️ Warning ${warningCount}/3\n\n🚫 Calls are not allowed. After 3 warnings you will be blocked.`
           });
         }
 
@@ -269,7 +240,7 @@ const initializeAntiCall = (sock) => {
       }
       if (changed) saveData(data);
     } catch (err) {
-      console.error('AntiCall Error', err);
+      console.error('AntiCall Error:', err);
     }
   });
 };
@@ -279,4 +250,3 @@ module.exports = {
   initializeAntiCall,
   isOwner
 };
-                                                
